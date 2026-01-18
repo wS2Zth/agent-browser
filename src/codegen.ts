@@ -273,7 +273,7 @@ export class CodegenRecorder {
 
       case 'press':
         if (command.selector) {
-          return `await page.press('${command.selector}', '${command.key}');`;
+          return `await page.press('${this.escapeString(command.selector)}', '${command.key}');`;
         }
         return `await page.keyboard.press('${command.key}');`;
 
@@ -319,7 +319,7 @@ export class CodegenRecorder {
         return `await ${this.buildLocator(command.selector, refMap)}.scrollIntoViewIfNeeded();`;
 
       case 'drag':
-        return `await page.dragAndDrop('${command.source}', '${command.target}');`;
+        return `await page.dragAndDrop('${this.escapeString(command.source)}', '${this.escapeString(command.target)}');`;
 
       case 'upload': {
         const files = Array.isArray(command.files) ? command.files : [command.files];
@@ -335,7 +335,7 @@ export class CodegenRecorder {
 
       case 'wait':
         if (command.selector) {
-          return `await page.waitForSelector('${command.selector}', { state: '${command.state ?? 'visible'}' });`;
+          return `await page.waitForSelector('${this.escapeString(command.selector)}', { state: '${command.state ?? 'visible'}' });`;
         }
         if (command.timeout) {
           return `await page.waitForTimeout(${command.timeout});`;
@@ -349,7 +349,7 @@ export class CodegenRecorder {
         return `await page.waitForLoadState('${command.state}');`;
 
       case 'waitforfunction':
-        return `await page.waitForFunction(() => ${command.expression});`;
+        return `await page.waitForFunction(() => ${this.escapeTemplateLiteral(command.expression)});`;
 
       case 'back':
         return `await page.goBack();`;
@@ -361,7 +361,7 @@ export class CodegenRecorder {
         return `await page.reload();`;
 
       case 'evaluate':
-        return `await page.evaluate(() => { ${command.script} });`;
+        return `await page.evaluate(() => { ${this.escapeTemplateLiteral(command.script)} });`;
 
       case 'screenshot':
         if (command.path) {
@@ -423,8 +423,8 @@ export class CodegenRecorder {
       case 'nth': {
         const locator =
           command.index === -1
-            ? `page.locator('${command.selector}').last()`
-            : `page.locator('${command.selector}').nth(${command.index})`;
+            ? `page.locator('${this.escapeString(command.selector)}').last()`
+            : `page.locator('${this.escapeString(command.selector)}').nth(${command.index})`;
         if (command.subaction === 'fill' && command.value) {
           return `await ${locator}.fill('${this.escapeString(command.value)}');`;
         }
@@ -438,11 +438,11 @@ export class CodegenRecorder {
         return `await ${this.buildLocator(command.selector, refMap)}.clear();`;
 
       case 'tap':
-        return `await page.tap('${command.selector}');`;
+        return `await page.tap('${this.escapeString(command.selector)}');`;
 
       case 'frame':
         if (command.selector) {
-          return `const frame = await page.$('${command.selector}').then(el => el?.contentFrame());`;
+          return `const frame = await page.$('${this.escapeString(command.selector)}').then(el => el?.contentFrame());`;
         }
         if (command.name) {
           return `const frame = page.frame({ name: '${command.name}' });`;
@@ -524,21 +524,21 @@ export class CodegenRecorder {
       case 'multiselect':
         if ('selector' in command && 'values' in command) {
           const values = command.values.map((v) => `'${this.escapeString(v)}'`).join(', ');
-          return `await page.locator('${command.selector}').selectOption([${values}]);`;
+          return `await page.locator('${this.escapeString(command.selector)}').selectOption([${values}]);`;
         }
         return null;
 
       // Dispatch event
       case 'dispatch':
         if ('selector' in command && 'event' in command) {
-          return `await page.locator('${command.selector}').dispatchEvent('${command.event}');`;
+          return `await page.locator('${this.escapeString(command.selector)}').dispatchEvent('${this.escapeString(command.event)}');`;
         }
         return null;
 
       // Set value directly
       case 'setvalue':
         if ('selector' in command && 'value' in command) {
-          return `await page.locator('${command.selector}').fill('${this.escapeString(command.value)}');`;
+          return `await page.locator('${this.escapeString(command.selector)}').fill('${this.escapeString(command.value)}');`;
         }
         return null;
 
@@ -549,7 +549,7 @@ export class CodegenRecorder {
       // Add scripts/styles
       case 'addscript':
         if ('content' in command && command.content) {
-          return `await page.addScriptTag({ content: \`${command.content}\` });`;
+          return `await page.addScriptTag({ content: \`${this.escapeTemplateLiteral(command.content)}\` });`;
         }
         if ('url' in command && command.url) {
           return `await page.addScriptTag({ url: '${this.escapeString(command.url)}' });`;
@@ -558,7 +558,7 @@ export class CodegenRecorder {
 
       case 'addstyle':
         if ('content' in command && command.content) {
-          return `await page.addStyleTag({ content: \`${command.content}\` });`;
+          return `await page.addStyleTag({ content: \`${this.escapeTemplateLiteral(command.content)}\` });`;
         }
         if ('url' in command && command.url) {
           return `await page.addStyleTag({ url: '${this.escapeString(command.url)}' });`;
@@ -567,14 +567,14 @@ export class CodegenRecorder {
 
       case 'addinitscript':
         if ('script' in command) {
-          return `await context.addInitScript(() => { ${command.script} });`;
+          return `await context.addInitScript(() => { ${this.escapeTemplateLiteral(command.script)} });`;
         }
         return null;
 
       // Set content
       case 'setcontent':
         if ('html' in command) {
-          return `await page.setContent(\`${command.html}\`);`;
+          return `await page.setContent(\`${this.escapeTemplateLiteral(command.html)}\`);`;
         }
         return null;
 
@@ -717,7 +717,7 @@ export class CodegenRecorder {
       return `page.getByText('${this.escapeString(selectorOrRef.slice(5))}')`;
     }
     if (selectorOrRef.startsWith('xpath=')) {
-      return `page.locator('${selectorOrRef}')`;
+      return `page.locator('${this.escapeString(selectorOrRef)}')`;
     }
 
     // Default to CSS selector
@@ -725,7 +725,7 @@ export class CodegenRecorder {
   }
 
   /**
-   * Escape string for JavaScript/TypeScript
+   * Escape string for JavaScript/TypeScript (single-quoted strings)
    */
   private escapeString(str: string): string {
     return str
@@ -734,6 +734,14 @@ export class CodegenRecorder {
       .replace(/\n/g, '\\n')
       .replace(/\r/g, '\\r')
       .replace(/\t/g, '\\t');
+  }
+
+  /**
+   * Escape content for template literals (backtick strings)
+   * Escapes backticks, backslashes, and ${} interpolation
+   */
+  private escapeTemplateLiteral(str: string): string {
+    return str.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
   }
 
   /**
